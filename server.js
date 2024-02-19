@@ -140,7 +140,9 @@ app.post('/login', async (req, res) => {
     const [check] = await pool.query("SELECT * FROM tbl_users WHERE user_name = ?", [userName]);
 
     if (check.length === 0) {
-      return res.status(200).json({ message: "Username is not exist" });
+      console.log("tarantado")
+      res.status(200).json({ message: "Username is not exist" })
+      return;
     } else {
       bcrypt.compare(password, check[0].password, async (err, response) => {
         if (response) {
