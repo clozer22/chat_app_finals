@@ -171,6 +171,22 @@ app.post('/login', async (req, res) => {
 })
 
 
+
+
+
+app.get('/getUsers/:id', async (req, res) => {
+  const { id } = req.params;
+
+  const [users] = await pool.query("SELECT * FROM tbl_users WHERE user_id != ?", [id])
+    if (users.length === 0) {
+      return res.status(400).json({ message: "No users" });
+    } else {
+      return res.status(200).json({ message: "Successfully get all the users", users: users });
+    }
+});
+
+
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
