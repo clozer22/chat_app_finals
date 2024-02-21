@@ -186,6 +186,30 @@ app.get('/getUsers/:id', async (req, res) => {
 });
 
 
+// LOGOUT
+
+app.post('/logout', async(req, res) => {
+  const {userId} = req.body
+  try{
+    const update = await pool.query("UPDATE tbl_users SET status = 'Offline' WHERE user_id = ?" , [userId]);
+
+    if(update){
+      req.session.destroy(err => {
+      if(err){
+        console.log(err)
+      }else{
+        res.clearCookie('userID'); 
+        res.status(200).json({message: "Logged out successfully"});
+      }
+      });
+    }else{
+      res.status(400).json({message:"Failed to logout"});
+    }
+  }catch(error){
+    console.error(error)
+  }
+})
+
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
