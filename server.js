@@ -177,7 +177,7 @@ app.post('/login', async (req, res) => {
 app.get('/getUsers/:id', async (req, res) => {
   const { id } = req.params;
 
-  const [users] = await pool.query("SELECT * FROM tbl_users WHERE user_id != ?", [id])
+  const [users] = await pool.query("SELECT a.user_id, a.friend_user_id, b.* FROM ( SELECT user_id, friend_user_id FROM tbl_friends_list UNION SELECT friend_user_id, user_id FROM tbl_friends_list ) as a LEFT JOIN tbl_users b ON a.friend_user_id = b.user_id WHERE a.user_id = ?", [id])
     if (users.length === 0) {
       return res.status(400).json({ message: "No users" });
     } else {
@@ -207,6 +207,55 @@ app.post('/logout', async(req, res) => {
     }
   }catch(error){
     console.error(error)
+  }
+})
+
+
+app.post("/sendFriendRequest", async(req, res) => {
+  const {userId, userName, sentUserId} = req.body;
+  try{
+    const [checking1] = await pool.query("SELECT * FROM tbl_users WHERE user_id = ? AND user_name = ?", [sentUserId, userName]);
+
+    if(checking1.length === 0){
+      res.json({message: "That user is not exist."})
+      return;
+    }else{
+      const [checking2] = await pool.query("SELECT * FROM tbl_friends_list WHERE (user_id = ? AND friend_user_id = ?) OR (user_id = ? AND friend_user_id = ?)", [userId, sentUserId, sentUserId, userId]);
+
+      if(checking2.length > 0){
+        res.json({message: "That user is already your friend."})
+        return;
+      }else{
+        const addUser = await pool.query("INSERT INTO tbl_friends_list (user_id, friend_user_id) VALUES (?,?)",[userId, sentUserId]);
+  
+        if(addUser){
+          console.log("FRIEND REQ SENT")
+          res.status(200).json({message: "Successfully sent"})
+          return;
+        }else{
+          console.log("FRIEND REQ SENT FAILED")
+          res.status(400).json({message: "failed to sent"})
+          return;
+        }
+      }
+    }
+  }catch(error){
+    console.log(error)
+  }
+})
+
+
+app.get("/getUserData/:user_id", async(req,res) => {
+  const {user_id} = req.params;
+
+  const [select] = await pool.query("SELECT * FROM tbl_users WHERE user_id = ? ", [user_id]);
+
+  if(select.length > 0){
+    res.status(200).json({message: "Successfully fetch current user info", user_data: select});
+    return;
+  }else{
+    res.status(400).json({message:"failed to fetch info of the current user"});
+    return;
   }
 })
 
