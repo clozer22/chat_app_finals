@@ -75,7 +75,7 @@ app.post('/messages', async(req, res) => {
 app.get('/messages/:recipientId/:senderId', async(req, res) => {
   const recipientId = req.params.recipientId;
   const senderId = req.params.senderId;
-  const [sql] = await pool.query('SELECT * FROM tbl_message WHERE (receiver_id = ? AND sender_id = ?) OR (receiver_id = ? AND sender_id = ?)', [recipientId, senderId, senderId, recipientId]);
+  const [sql] = await pool.query('SELECT * FROM tbl_message WHERE (receiver_id = ? AND sender_id = ?) OR (receiver_id = ? AND sender_id = ?) AND is_deleted = "N"', [recipientId, senderId, senderId, recipientId]);
     if (sql.length === 0) {
       res.status(500).json({ error: 'Error retrieving messages' });
       return;
@@ -257,6 +257,35 @@ app.get("/getUserData/:user_id", async(req,res) => {
     res.status(400).json({message:"failed to fetch info of the current user"});
     return;
   }
+})
+
+
+// DELETE CONVO
+
+app.post('/removeMessage/:messageId', async(req, res) => {
+  const {messageId} = req.params;
+
+  const [deleteConvo] = await pool.query("UPDATE tbl_message SET is_deleted = 'Y' WHERE message_id = ?", [messageId]);
+
+  if(deleteConvo){
+    res.status(200).json({message: "Deleted successfully"})
+  }else{
+    s.status(400).json({message: "Failed to delete"})
+  }
+
+})
+
+app.post('/deleteMessage/:messageId', async(req, res) => {
+  const {messageId} = req.params;
+
+  const [deleteConvo] = await pool.query("DELETE FROM tbl_message WHERE message_id = ?", [messageId]);
+
+  if(deleteConvo){
+    res.status(200).json({message: "Deleted successfully"})
+  }else{
+    s.status(400).json({message: "Failed to delete"})
+  }
+
 })
 
 
