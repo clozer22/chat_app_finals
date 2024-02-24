@@ -77,10 +77,10 @@ app.get('/messages/:recipientId/:senderId', async(req, res) => {
   const senderId = req.params.senderId;
   const [sql] = await pool.query('SELECT * FROM tbl_message WHERE (receiver_id = ? AND sender_id = ?) OR (receiver_id = ? AND sender_id = ?) AND is_deleted = "N"', [recipientId, senderId, senderId, recipientId]);
     if (sql.length === 0) {
-      res.status(500).json({ error: 'Error retrieving messages' });
+      res.status(200).json({ message: 'Error retrieving messages', messageData: sql });
       return;
     }else{
-      res.json(sql);
+      res.status(200).json({message: "messages fetched", messageData: sql});
     }
 });
 
