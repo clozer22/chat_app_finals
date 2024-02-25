@@ -108,7 +108,7 @@ app.post('/register', async (req, res) => {
       const salt = await bcrypt.genSalt(10);
       const hash = await bcrypt.hash(password, salt);
 
-      await pool.query("INSERT INTO tbl_users (first_name, last_name, user_name, password) VALUES (?,?,?,?)", [firstName, lastName, userName, hash]);
+      await pool.query("INSERT INTO tbl_users (first_name, last_name, user_name, password, profile_img, cover_img) VALUES (?,?,?,?,?,?)", [firstName, lastName, userName, hash, 'defaultPic.png', 'defaultPic.png']);
 
       res.status(200).json({ message: 'User registered successfully', userName: userName });
     }
@@ -304,6 +304,20 @@ app.post('/unfriend', async (req, res) => {
       return res.status(500).json({ message: "Internal server error" });
   }
 });
+
+
+app.post("/changeCover", async(req, res) => {
+  const {cover_img, user_id} = req.body;
+  const insert = pool.query("UPDATE tbl_users SET cover_img = ? WHERE user_id = ?", [cover_img, user_id]);
+
+  if(insert){
+    return res.status(200).json({message: "cover changed"});
+  }else{
+    return res.status(400).json({message: "failed to changed"});
+  }
+})
+
+
 
 
 app.listen(PORT, () => {
