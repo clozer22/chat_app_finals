@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+require('dotenv').config();
 const mysql = require('mysql2');
 const cookieParser = require('cookie-parser')
 const session = require('express-session')
@@ -9,7 +10,7 @@ const bcrypt = require('bcrypt')
 const app = express();
 app.use(express.json())
 app.use(cookieParser())
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 
 app.use(bodyParser.urlencoded({ extended: true }))
 
@@ -23,10 +24,10 @@ app.use(
 
 const pool = mysql
   .createPool({
-    host: 'localhost',
-    user: 'root',
-    password: '',
-    database: 'chat_app',
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
@@ -71,7 +72,6 @@ app.post('/messages', async(req, res) => {
 });
 
 
-
 app.get('/messages/:recipientId/:senderId', async(req, res) => {
   const recipientId = req.params.recipientId;
   const senderId = req.params.senderId;
@@ -85,29 +85,15 @@ app.get('/messages/:recipientId/:senderId', async(req, res) => {
 });
 
 app.get('/user', async(req, res) => {
-  const sql = "SELECT * FROM tbl_users";
+  const [sql] = await pool.query("SELECT * FROM tbl_users");
   if(sql.length > 0){
      console.log("tangina meron")
-     res.json({message: "tanginaaa meron"})
+     res.json({message: "tanginaaa meron", result: sql})
   }else{
      console.log("asdasdas")
      res.json({message: "tanginaaa walaaa"})
   }
 })
-
-// app.get('/contacts/:userId/', (req, res) => {
-//     const userId = req.params.userId;
-//     const sql = 'SELECT * FROM tbl_message WHERE receiver_id = ? AND sender_id = ?';
-//     pool.query(sql, [senderId], (err, results) => {
-//       if (err) {
-//         console.error('Error retrieving messages:', err);
-//         res.status(500).json({ error: 'Error retrieving messages' });
-//         return;
-//       }
-//       res.json(results);
-//     });
-//   });
-
 
 
 app.post('/register', async (req, res) => {
@@ -179,7 +165,7 @@ app.get('/getUsers/:id', async (req, res) => {
 
   const [users] = await pool.query("SELECT a.user_id, a.friend_user_id, b.* FROM ( SELECT user_id, friend_user_id FROM tbl_friends_list UNION SELECT friend_user_id, user_id FROM tbl_friends_list ) as a LEFT JOIN tbl_users b ON a.friend_user_id = b.user_id WHERE a.user_id = ?", [id])
     if (users.length === 0) {
-      return res.status(400).json({ message: "No users" });
+      return res.status(200).json({ message: "No users", users: users });
     } else {
       return res.status(200).json({ message: "Successfully get all the users", users: users });
     }
@@ -254,7 +240,7 @@ app.get("/getUserData/:user_id", async(req,res) => {
     res.status(200).json({message: "Successfully fetch current user info", user_data: select});
     return;
   }else{
-    res.status(400).json({message:"failed to fetch info of the current user"});
+    res.status(200).json({message:"failed to fetch info of the current user"});
     return;
   }
 })
@@ -287,6 +273,37 @@ app.post('/deleteMessage/:messageId', async(req, res) => {
   }
 
 })
+
+
+app.post('/unfriend', async (req, res) => {
+  try {
+      const { user_id, friend_id } = req.body;
+
+      // Basic input validation
+      if (!user_id || !friend_id) {
+          return res.status(400).json({ message: "Missing user_id or friend_id" });
+      }
+
+      const [checking] = await pool.query("SELECT * FROM tbl_friends_list WHERE (user_id = ? AND friend_user_id = ?) OR (user_id = ? AND friend_user_id = ?) ", [user_id, friend_id, friend_id, user_id]);
+
+      if (checking.length > 0) {
+          const unfriend = await pool.query("DELETE FROM tbl_friends_list WHERE friendship_id = ?", [checking[0].friendship_id]);
+          if (unfriend) {
+              console.log("Unfriended successfully");
+              console.log("Friendship ID:", checking[0].friendship_id);
+              return res.status(200).json({ message: "Deleted", sample: checking[0].friendship_id });
+          } else {
+              console.log("Failed to unfriend");
+              return res.status(500).json({ message: "Failed to unfriend" });
+          }
+      } else {
+          return res.status(404).json({ message: "No friendship found" });
+      }
+  } catch (error) {
+      console.error("Error unfriending:", error);
+      return res.status(500).json({ message: "Internal server error" });
+  }
+});
 
 
 app.listen(PORT, () => {
