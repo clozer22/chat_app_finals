@@ -370,28 +370,52 @@ app.post('/changeCover', async (req, res) => {
 })
 
 app.post('/updateInfo', async (req, res) => {
-  const { user_name, first_name, last_name, bio, user_id } = req.body
+  const { user_name, first_name, last_name, bio, user_id } = req.body;
 
   try {
-    let update;
-    if(first_name !== ""){
-      update = await pool.query("UPDATE tbl_users SET first_name = ? WHERE user_id = ?", [first_name, user_id]);
-    }else if(last_name !== ""){
-      update = await pool.query("UPDATE tbl_users SET  last_name = ? WHERE user_id = ?", [last_name, user_id]);
-    }else if(user_name !== ""){
-      update = await pool.query("UPDATE tbl_users SET  user_name = ? WHERE user_id = ?", [user_name, user_id]);
+    if (!(user_name || first_name || last_name || bio)) {
+      return res.status(200).json({ message: "No data provided for update" });
     }
 
-    if(update){
-      return res.status(200).json({message: "Updated"});
-    }else{
-      return res.status(200).json({message: "Failed to update"})
+    let updateQuery = "UPDATE tbl_users SET";
+    const updateValues = [];
+
+    if (first_name !== "") {
+      updateQuery += " first_name = ?,";
+      updateValues.push(first_name);
     }
-    
+    if (last_name !== "") {
+      updateQuery += " last_name = ?,";
+      updateValues.push(last_name);
+    }
+    if (user_name !== "") {
+      updateQuery += " user_name = ?,";
+      updateValues.push(user_name);
+    }
+    if (bio !== "") {
+      updateQuery += " bio = ?,";
+      updateValues.push(bio);
+    }
+
+    updateQuery = updateQuery.slice(0, -1);
+
+    updateQuery += " WHERE user_id = ?";
+    updateValues.push(user_id);
+
+    const update = await pool.query(updateQuery, updateValues);
+
+    if (update.affectedRows > 0) {
+      return res.status(200).json({ message: "Updated" });
+    } else {
+      return res.status(200).json({ message: "Failed to update" });
+    }
+
   } catch (error) {
-    console.log(error)
+    console.log(error);
+    return res.status(500).json({ message: "Internal server error" });
   }
-})
+});
+
 
 app.post('/changeProfile', async (req, res) => {
   const { profile_img, user_id } = req.body
@@ -404,6 +428,39 @@ app.post('/changeProfile', async (req, res) => {
     return res.status(200).json({ message: 'profile changed' })
   } else {
     return res.status(400).json({ message: 'failed to changed' })
+  }
+})
+
+
+
+// CHANGE PASSWORD
+app.post("/changePassword", async(req,res) => {
+  const {user_id, currentPass, newPass, confirmPass} = req.body;
+  const hash = await bcrypt.hash(confirmPass, 10)
+
+  const [check] = await pool.query("SELECT * FROM tbl_users WHERE user_id = ?", [user_id]);
+
+  if(check.length === 0){
+    return console.log("no user found");
+  }else{
+    bcrypt.compare(currentPass, check[0].password, async (err, response) => {
+      if(response){
+        if(newPass === confirmPass){
+          const update = await pool.query("UPDATE tbl_users SET password = ? WHERE user_id = ?", [hash, user_id]);
+          if(update){
+           res.status(200).json({message: "password changed"})
+          }else{
+            return res.status(200).json({message: "failed to update password"})
+          }
+        }else{
+          return res.status(200).json({message: "New password and confirm password does not matched."})
+        }
+        
+      }else{
+        res.status(200).json({message: "The current password is incorrect."})
+      }
+    })
+
   }
 })
 
