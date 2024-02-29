@@ -49,6 +49,8 @@ app.use(
   })
 )
 
+
+// SEND MESSAGE TO RECIPIENT
 app.post('/messages', async (req, res) => {
   const { sender, recipient, message } = req.body
   try {
@@ -69,6 +71,8 @@ app.post('/messages', async (req, res) => {
   }
 })
 
+
+// GET ALL THE MESSAGES BETWEEN THE SENDER AND RECIPIENT
 app.get('/messages/:recipientId/:senderId', async (req, res) => {
   const recipientId = req.params.recipientId
   const senderId = req.params.senderId
@@ -86,6 +90,7 @@ app.get('/messages/:recipientId/:senderId', async (req, res) => {
   }
 })
 
+// GET THE USER INFO
 app.get('/user', async (req, res) => {
   const [sql] = await pool.query('SELECT * FROM tbl_users')
   if (sql.length > 0) {
@@ -97,6 +102,7 @@ app.get('/user', async (req, res) => {
   }
 })
 
+// CREATE ACCOUNT
 app.post('/register', async (req, res) => {
   const { firstName, lastName, userName, password } = req.body
 
@@ -134,6 +140,9 @@ app.post('/register', async (req, res) => {
   }
 })
 
+
+
+// LOGIN
 app.post('/login', async (req, res) => {
   const { userName, password } = req.body
   try {
@@ -176,11 +185,13 @@ app.post('/login', async (req, res) => {
   }
 })
 
+
+// GET ALL THE LIST OF FRIENDS
 app.get('/getUsers/:id', async (req, res) => {
   const { id } = req.params
 
   const [users] = await pool.query(
-    'SELECT a.user_id, a.friend_user_id, b.* FROM ( SELECT user_id, friend_user_id FROM tbl_friends_list UNION SELECT friend_user_id, user_id FROM tbl_friends_list ) as a LEFT JOIN tbl_users b ON a.friend_user_id = b.user_id WHERE a.user_id = ?',
+    "SELECT a.user_id, a.friend_user_id, b.* FROM ( SELECT user_id, friend_user_id, status FROM tbl_friends_list  WHERE status = 'accepted'UNION SELECT friend_user_id, user_id, status FROM tbl_friends_list WHERE status = 'accepted') as a LEFT JOIN tbl_users b ON a.friend_user_id = b.user_id WHERE a.user_id = ?",
     [id]
   )
   if (users.length === 0) {
@@ -192,8 +203,53 @@ app.get('/getUsers/:id', async (req, res) => {
   }
 })
 
-// LOGOUT
+// GET ALL THE FRIEND REQUEST LIST
+app.get('/getFriendReq/:id', async (req, res) => {
+  const { id } = req.params
 
+  const [users] = await pool.query(
+    "SELECT a.friendship_id, a.user_id, a.friend_user_id, b.* FROM ( SELECT user_id, friend_user_id, status, friendship_id FROM tbl_friends_list  WHERE status = 'pending' AND user_id != ? UNION SELECT friend_user_id, user_id, status, friendship_id FROM tbl_friends_list WHERE status = 'pending' AND user_id != ?) as a LEFT JOIN tbl_users b ON a.friend_user_id = b.user_id WHERE a.user_id = ?",
+    [id, id, id]
+  )
+  if (users.length === 0) {
+    return res.status(200).json({ message: 'No users', users: users })
+  } else {
+    return res
+      .status(200)
+      .json({ message: 'Successfully get all the users', users: users })
+  }
+})
+
+// ACCEPTING FRIEND REQUEST
+app.post("/acceptFriend", async(req,res) => {
+  const {user_id} = req.body;
+
+  const update = await pool.query("UPDATE tbl_friends_list SET status = 'accepted' WHERE friendship_id = ?", [user_id]);
+  if(update){
+    res.status(200).json({message: "accepted"});
+    return;
+  }else{
+    res.status(400).json({message: "failed to accept"});
+  }
+})
+
+
+// REJECTING FRIEND REQUEST
+app.post("/rejectRequest", async(req,res) => {
+  const {user_id} = req.body;
+
+  const update = await pool.query("DELETE FROM tbl_friends_list WHERE friendship_id = ?", [user_id]);
+  if(update){
+    res.status(200).json({message: "rejected"});
+    return;
+  }else{
+    res.status(400).json({message: "failed to reject"});
+  }
+})
+
+
+
+// LOGOUT
 app.post('/logout', async (req, res) => {
   const { userId } = req.body
   try {
@@ -219,6 +275,8 @@ app.post('/logout', async (req, res) => {
   }
 })
 
+
+// SEND A FRIEND REQUEST
 app.post('/sendFriendRequest', async (req, res) => {
   const { userId, userName, sentUserId } = req.body
   try {
@@ -241,8 +299,8 @@ app.post('/sendFriendRequest', async (req, res) => {
         return
       } else {
         const addUser = await pool.query(
-          'INSERT INTO tbl_friends_list (user_id, friend_user_id) VALUES (?,?)',
-          [userId, sentUserId]
+          'INSERT INTO tbl_friends_list (user_id, friend_user_id, status) VALUES (?,?,?)',
+          [userId, sentUserId, 'pending']
         )
 
         if (addUser) {
@@ -261,6 +319,8 @@ app.post('/sendFriendRequest', async (req, res) => {
   }
 })
 
+
+// GET THE USER DATA
 app.get('/getUserData/:user_id', async (req, res) => {
   const { user_id } = req.params
 
@@ -285,8 +345,8 @@ app.get('/getUserData/:user_id', async (req, res) => {
   }
 })
 
-// DELETE CONVO
 
+// DELETE CONVO
 app.post('/removeMessage/:messageId', async (req, res) => {
   const { messageId } = req.params
 
@@ -302,6 +362,8 @@ app.post('/removeMessage/:messageId', async (req, res) => {
   }
 })
 
+
+// DELETE A SPECIFIC MESSAGE
 app.post('/deleteMessage/:messageId', async (req, res) => {
   const { messageId } = req.params
 
@@ -317,11 +379,12 @@ app.post('/deleteMessage/:messageId', async (req, res) => {
   }
 })
 
+
+// UNFRIEND THE USER 
 app.post('/unfriend', async (req, res) => {
   try {
     const { user_id, friend_id } = req.body
 
-    // Basic input validation
     if (!user_id || !friend_id) {
       return res.status(400).json({ message: 'Missing user_id or friend_id' })
     }
@@ -355,6 +418,9 @@ app.post('/unfriend', async (req, res) => {
   }
 })
 
+
+
+// CHANGE COVER PHOTO
 app.post('/changeCover', async (req, res) => {
   const { cover_img, user_id } = req.body
   const insert = pool.query(
@@ -369,6 +435,9 @@ app.post('/changeCover', async (req, res) => {
   }
 })
 
+
+
+// UPDATE INFORMATION
 app.post('/updateInfo', async (req, res) => {
   const { user_name, first_name, last_name, bio, user_id } = req.body;
 
@@ -417,6 +486,8 @@ app.post('/updateInfo', async (req, res) => {
 });
 
 
+
+// CHANGE PROFILE PICTURE
 app.post('/changeProfile', async (req, res) => {
   const { profile_img, user_id } = req.body
   const insert = pool.query(
