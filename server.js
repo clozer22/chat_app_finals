@@ -536,6 +536,49 @@ app.post("/changePassword", async(req,res) => {
 })
 
 
+app.post("/verify", async(req,res) => {
+  const {email} = req.body
+
+  const update = await pool.query("UPDATE tbl_users SET verified = 1 WHERE user_name = ?",[email]);
+
+  if(update){
+    return res.status(200).json({message: "verified"})
+  }else{
+    return res.status(400).json({ message: "You entered the wrong username." });
+  }
+})
+
+
+app.post("/resetPassword", async(req,res) => {
+  const {email, newPass, conPass} = req.body
+
+  const hash = await bcrypt.hash(newPass, 10)
+
+  const [check] = await pool.query("SELECT * FROM tbl_users WHERE user_name = ?", [email]);
+
+  if(check.length === 0){
+    return console.log("no user found");
+  }else{
+    const hash = await bcrypt.hash(newPass, 10)
+    if(newPass === conPass){
+      const updatePass = await pool.query("UPDATE tbl_users SET password = ? WHERE user_name = ?",[hash, email]);
+      
+      if(updatePass){
+        return res.status(200).json({message: "updated password"})
+      }else{
+        return res.json(400).json({message: "failed to update password"});
+      }
+    }else{
+      return res.json({message: "The new password and confirm password does not match"});
+    }
+
+
+  }
+})
+
+
+
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`)
 })
