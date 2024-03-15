@@ -6,6 +6,9 @@ const mysql = require('mysql2')
 const cookieParser = require('cookie-parser')
 const session = require('express-session')
 const bcrypt = require('bcrypt')
+const multer = require('multer');
+const path = require('path');
+
 
 const app = express()
 app.use(express.json())
@@ -48,6 +51,23 @@ app.use(
     // }
   })
 )
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, './uploaded_img/'); // Specify the destination folder
+  },
+  filename: function (req, file, cb) {
+    cb(null, file.originalname); // Use the original filename
+  }
+});
+
+// Initialize upload
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 1000000 } // Set file size limit if needed
+});
+
+app.use('/uploaded_img', express.static(path.join(__dirname, 'uploaded_img')));
 
 
 // SEND MESSAGE TO RECIPIENT
@@ -420,20 +440,30 @@ app.post('/unfriend', async (req, res) => {
 
 
 
-// CHANGE COVER PHOTO
-app.post('/changeCover', async (req, res) => {
-  const { cover_img, user_id } = req.body
-  const insert = pool.query(
-    'UPDATE tbl_users SET cover_img = ? WHERE user_id = ?',
-    [cover_img, user_id]
-  )
-
-  if (insert) {
-    return res.status(200).json({ message: 'cover changed' })
-  } else {
-    return res.status(400).json({ message: 'failed to changed' })
+app.post('/changeCover', upload.single('cover_img'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded' });
   }
-})
+  
+  const { filename } = req.file; // Get the filename of the uploaded image
+  const { user_id } = req.body;
+
+  try {
+    const insert = await pool.query(
+      'UPDATE tbl_users SET cover_img = ? WHERE user_id = ?',
+      [filename, user_id]
+    );
+
+    if (insert) {
+      return res.status(200).json({ message: 'Cover photo changed' });
+    } else {
+      return res.status(400).json({ message: 'Failed to change cover photo' });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 
 
@@ -487,21 +517,31 @@ app.post('/updateInfo', async (req, res) => {
 
 
 
-// CHANGE PROFILE PICTURE
-app.post('/changeProfile', async (req, res) => {
-  const { profile_img, user_id } = req.body
-  const insert = pool.query(
-    'UPDATE tbl_users SET profile_img = ? WHERE user_id = ?',
-    [profile_img, user_id]
-  )
 
-  if (insert) {
-    return res.status(200).json({ message: 'profile changed' })
-  } else {
-    return res.status(400).json({ message: 'failed to changed' })
+app.post('/changeProfile', upload.single('profile_img'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded' });
   }
-})
+  
+  const { filename } = req.file; // Get the filename of the uploaded image
+  const { user_id } = req.body;
 
+  try {
+    const insert = await pool.query(
+      'UPDATE tbl_users SET profile_img = ? WHERE user_id = ?',
+      [filename, user_id]
+    );
+
+    if (insert) {
+      return res.status(200).json({ message: 'Profile picture changed' });
+    } else {
+      return res.status(400).json({ message: 'Failed to change profile picture' });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 
 // CHANGE PASSWORD
